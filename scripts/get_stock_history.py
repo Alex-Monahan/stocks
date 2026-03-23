@@ -53,6 +53,9 @@ def main():
         if validate_symbol(symbol):
             print(f"Fetching data for: {symbol}")
             stock_data = fetch_stock_data(symbol, start_date, end_date)
+            # Flatten multi-level columns from newer yfinance
+            if isinstance(stock_data.columns, pd.MultiIndex):
+                stock_data = stock_data.droplevel('Ticker', axis=1)
             stock_data['Symbol'] = symbol  # Add symbol column to the data
             all_data.append(stock_data)
         else:
@@ -61,6 +64,7 @@ def main():
     if all_data:
         # Concatenate all stock data into one DataFrame
         result_df = pd.concat(all_data)
+        result_df.index.name = 'Date'
 
         # Generate timestamp
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
