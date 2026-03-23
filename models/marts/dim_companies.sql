@@ -1,3 +1,9 @@
+{{
+  config(
+    static_analysis = 'baseline',
+    )
+}}
+
 with
     cte_all_rows as (
         select
