@@ -35,6 +35,10 @@ models:
     raw:
       +materialized: table
 
+seeds:
+  stocks:
+    +quote_columns: true
+
 # on-run-start:
 #   - 'CREATE OR REPLACE activity_log AS SELECT * FROM md:stocks_dev.activity_log WITH SAMPLE 1%'
 

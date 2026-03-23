@@ -3,6 +3,35 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 
+from seed_utils import append_seed_rows, current_snapshot_ts
+
+
+STOCK_HISTORY_COLUMNS = ['Date', 'Close', 'High', 'Low', 'Open', 'Volume', 'Symbol']
+
+
+def normalize_stock_history(stock_data, symbol):
+    """Flattens per-symbol history into the stable CSV schema used by seeds."""
+    if stock_data.empty:
+        return pd.DataFrame(columns=STOCK_HISTORY_COLUMNS)
+
+    normalized = stock_data.copy()
+
+    if isinstance(normalized.columns, pd.MultiIndex):
+        normalized.columns = normalized.columns.get_level_values(0)
+
+    normalized = normalized.reset_index()
+
+    if 'Date' not in normalized.columns and len(normalized.columns) > 0:
+        normalized = normalized.rename(columns={normalized.columns[0]: 'Date'})
+
+    normalized['Symbol'] = symbol
+
+    for column in STOCK_HISTORY_COLUMNS:
+        if column not in normalized.columns:
+            normalized[column] = pd.NA
+
+    return normalized[STOCK_HISTORY_COLUMNS]
+
 def read_symbols_from_file(file_path):
     """Reads stock symbols from a file."""
     try:
@@ -33,7 +62,7 @@ def fetch_stock_data(symbol, start_date, end_date):
         return pd.DataFrame()
 
 def main():
-    # Define the date range (last 30 days)
+    # Define the date range (last 360 days)
     end_date = datetime.now().strftime('%Y-%m-%d')
     start_date = (datetime.now() - timedelta(days=360)).strftime('%Y-%m-%d')
 
@@ -53,29 +82,23 @@ def main():
         if validate_symbol(symbol):
             print(f"Fetching data for: {symbol}")
             stock_data = fetch_stock_data(symbol, start_date, end_date)
-            # Flatten multi-level columns from newer yfinance
-            if isinstance(stock_data.columns, pd.MultiIndex):
-                stock_data = stock_data.droplevel('Ticker', axis=1)
-            stock_data['Symbol'] = symbol  # Add symbol column to the data
-            all_data.append(stock_data)
+            stock_data = normalize_stock_history(stock_data, symbol)
+            if not stock_data.empty:
+                all_data.append(stock_data)
         else:
             print(f"Invalid symbol: {symbol}")
 
     if all_data:
         # Concatenate all stock data into one DataFrame
-        result_df = pd.concat(all_data)
-        result_df.index.name = 'Date'
+        result_df = pd.concat(all_data, ignore_index=True)
+        snapshot_ts = current_snapshot_ts()
+        result_df['snapshot_ts'] = snapshot_ts
 
-        # Generate timestamp
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-
-        # Export to CSV with timestamp in the file name
-        file_name = os.path.join(script_dir, '..', 'data', f"ticker_history_{timestamp}.csv")
-        result_df.to_csv(file_name, index=True)
-        print(f"Data saved to {file_name}")
+        seed_path = os.path.join(script_dir, '..', 'seeds', 'ticker_history.csv')
+        added_rows = append_seed_rows(seed_path, result_df, sort_columns=['Symbol', 'Date'])
+        print(f"Stock history snapshot {snapshot_ts} merged into {seed_path} ({added_rows} new rows)")
     else:
         print("No valid stock data found to save.")
 
 if __name__ == "__main__":
     main()
-
