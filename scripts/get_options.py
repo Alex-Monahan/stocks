@@ -1,7 +1,40 @@
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
 import os
+
+from seed_utils import append_seed_rows, current_snapshot_ts
+
+
+OPTION_COLUMNS = [
+    'contractSymbol',
+    'lastTradeDate',
+    'strike',
+    'lastPrice',
+    'bid',
+    'ask',
+    'change',
+    'percentChange',
+    'volume',
+    'openInterest',
+    'impliedVolatility',
+    'inTheMoney',
+    'contractSize',
+    'currency',
+    'Type',
+    'Expiration',
+    'Symbol',
+]
+
+
+def normalize_option_columns(df):
+    """Projects option data into a stable, seed-friendly column set."""
+    normalized = df.copy()
+
+    for column in OPTION_COLUMNS:
+        if column not in normalized.columns:
+            normalized[column] = pd.NA
+
+    return normalized[OPTION_COLUMNS]
 
 def read_symbols_from_file(file_path):
     """Reads stock symbols from a file."""
@@ -31,9 +64,9 @@ def fetch_option_data(symbol):
             options = stock.option_chain(exp)
             
             # Combine calls and puts with expiration date
-            calls = options.calls
+            calls = options.calls.copy()
             calls['Type'] = 'Call'
-            puts = options.puts
+            puts = options.puts.copy()
             puts['Type'] = 'Put'
             
             options_data = pd.concat([calls, puts])
@@ -71,19 +104,22 @@ def main():
 
     if all_option_data:
         # Concatenate all option data into one DataFrame
-        result_df = pd.concat(all_option_data)
+        result_df = pd.concat(all_option_data, ignore_index=True)
+        result_df = normalize_option_columns(result_df)
+        result_df['snapshot_ts'] = current_snapshot_ts()
 
-        # Generate timestamp
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-
-
-        # Export to CSV with timestamp in the file name
-        file_name = os.path.join(script_dir, '..', 'data', f"option_history_{timestamp}.csv")
-        result_df.to_csv(file_name, index=True)
-        print(f"Data saved to {file_name}")
+        seed_path = os.path.join(script_dir, '..', 'seeds', 'option_history.csv')
+        added_rows = append_seed_rows(
+            seed_path,
+            result_df,
+            sort_columns=['Symbol', 'Expiration', 'contractSymbol'],
+        )
+        print(
+            f"Option snapshot {result_df['snapshot_ts'].iat[0]} merged into {seed_path} "
+            f"({added_rows} new rows)"
+        )
     else:
         print("No valid option data found to save.")
 
 if __name__ == "__main__":
     main()
-

@@ -8,3 +8,4 @@ data/*.csv
 .user.yml
 *.duckdb
 *.db
+dbt_internal_packages/

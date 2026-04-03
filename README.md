@@ -11,24 +11,21 @@ This workshop will help you get data from csv into MotherDuck, and lay out basic
 6. After it loads completely, _reload the window_ in order to make sure the dbt power user extension has access to your md environment.
 
 ### Running the project
-1. Get data from the yahoo finance api by running the following 3 commands:
-    - `python3 scripts/get_info.py`
-    - `python3 scripts/get_options.py`
-    - `python3 scripts/get_stock_history.py`
-2. Build the data warehouse with `dbt build` in the CLI.
-3. Lastly, plot the results using `python3 viz/line_chart.py`. The webpage will be available at `127.0.0.1:8050`.
-4. Alternatively, you can invoke these 3 steps with `make run`.
+1. Build the data warehouse with `dbt build` in the CLI. The default dbt target is the MotherDuck-backed `dev` profile, and the project ships with example CSV snapshots as dbt seeds under `seeds/`.
+2. Plot the results using `python3 viz/line_chart.py`. The webpage will be available at `127.0.0.1:8050`, and the app reads from `stocks_dev.main` in MotherDuck.
+3. Alternatively, you can invoke these 2 steps with `make run`.
+4. The Yahoo Finance helper scripts in `scripts/` append normalized rows directly into the stable seeds `seeds/ticker_info.csv`, `seeds/option_history.csv`, and `seeds/ticker_history.csv`. If a fetched row already exists, it is not duplicated.
 
 ### Data Flow Overview
-1. Data is extracted from yahoo finance API using python. The scripts run and write out a file to `data` folder with the timestamp in the name for each file.
+1. Example data is stored as dbt seeds in `seeds/`, with `snapshot_ts` recording when each snapshot was fetched.
     - `symbols.txt` contains the list of symbols for which to fetch data.
     - `get_info.py` gets the company information for each company.
     - `get_options.py` gets the currently open options. *note:* this data is temporal, and thus needs to be snapshotted. This is left as an exercise to the reader.
-    - `get_stock_history.py` gets the stock price history for the last 30 days.
-2. dbt creates a list of these files in `files.sql` with the Duckdb `glob` function.
-3. for each model - `company_info.sql` `options.sql` `stock_history.sql` - de-duplicate and load any new files.
-4. for the models in step 3, test to make sure that the primary key is unique.
-5. create a dataset of closing stock price X outstanding shares over time to estimate Market Cap.
+    - `get_stock_history.py` gets the stock price history for the last 360 days.
+    - Those scripts merge normalized snapshots into the stable seed files, so you can run the scripts and then run `dbt build`.
+2. The raw dbt models `company_info.sql`, `options.sql`, and `stock_history.sql` reference those seed relations directly.
+3. For the raw models in step 2, tests make sure that the primary key is unique.
+4. The marts create a dataset of closing stock price X outstanding shares over time to estimate Market Cap.
    
 ### Plotting
 
