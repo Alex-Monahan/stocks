@@ -11,5 +11,14 @@ stocks:
       type: duckdb
       schema: main
       path: stocks_local.db
-  target: dev
+    ducklakemd:
+      type: duckdb
+      attach:
+        - path: "md:stocks_ducklake"
+          is_ducklake: true
+          alias: my_catalog
+      threads: 1
+      extensions:
+        - httpfs
+  target: ducklakemd
 

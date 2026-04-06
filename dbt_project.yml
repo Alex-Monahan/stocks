@@ -34,6 +34,7 @@ models:
     # Config indicated by + and applies to all files under models/example/
     raw:
       +materialized: table
+      +database: my_catalog
 
 seeds:
   stocks:
